@@ -6,8 +6,8 @@
 **File structure** 
 
 ```sh
-├── inventory.yml
 ├── main.tf
+├── inventory.yml
 ├── playbook.yml
 └── README.md
 ```

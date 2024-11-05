@@ -6,8 +6,8 @@
 **File structure** 
 
 ```sh
-├── main.tf
 ├── inventory.yml
+├── main.tf
 ├── playbook.yml
 └── README.md
 ```
@@ -63,7 +63,46 @@ openssl genrsa -out amit.key 2048
 openssl req -new -key amit.key -out amit.csr -subj "/CN=amit"
 sudo openssl x509 -req -in amit.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out amit.crt -days 30
 
+# all access
+kubectl create clusterrolebinding amit-admin-binding --clusterrole=cluster-admin --user=amit
+
+# OR
+# minimal access
+kubectl create rolebinding amit-binding --clusterrole=view --user=amit --namespace=default
+
+
 kubectl config set-credentials amit --client-certificate=amit.crt --client-key=amit.key
 kubectl config set-context amit --cluster=kubernetes --namespace=default --user=amit
-kubectl create rolebinding amit-binding --clusterrole=view --user=amit --namespace=default
+   
+```
+
+**kubeconfig file creation**
+```sh
+# Step 1: Set the cluster details
+kubectl config set-cluster kubernetes --server=https://<server-address>:6443 \
+  --certificate-authority=amit.crt \
+  --embed-certs=true
+
+# Step 2: Set the user credentials
+kubectl config set-credentials amit \
+  --client-certificate=amit.crt \
+  --client-key=amit.key \
+  --embed-certs=true
+
+# Step 3: Set the context
+kubectl config set-context amit \
+  --cluster=kubernetes \
+  --namespace=default \
+  --user=amit
+
+# Step 4: Set the context as the current context
+kubectl config use-context amit
+
+```
+
+**Access the cluster**
+
+```sh
+kubectl --insecure-skip-tls-verify get nodes
+kubectl --insecure-skip-tls-verify get pods
 ```

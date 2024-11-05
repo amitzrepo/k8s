@@ -59,11 +59,11 @@ ansible-playbook -i inventory.yml playbook.yml --syntax-check
 **user creation**
 
 ```sh
-    openssl genrsa -out amit.key 2048
-    openssl req -new -key amit.key -out amit.csr -subj "/CN=amit"
-    sudo openssl x509 -req -in amit.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out amit.crt -days 30
+openssl genrsa -out amit.key 2048
+openssl req -new -key amit.key -out amit.csr -subj "/CN=amit"
+sudo openssl x509 -req -in amit.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out amit.crt -days 30
 
-   kubectl config set-credentials amit --client-certificate=amit.crt --client-key=amit.key
-   kubectl config set-context amit --cluster=kubernetes --namespace=default --user=amit
-   kubectl create rolebinding amit-binding --clusterrole=view --user=amit --namespace=default
+kubectl config set-credentials amit --client-certificate=amit.crt --client-key=amit.key
+kubectl config set-context amit --cluster=kubernetes --namespace=default --user=amit
+kubectl create rolebinding amit-binding --clusterrole=view --user=amit --namespace=default
 ```

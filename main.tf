@@ -13,8 +13,8 @@ terraform {
 
   backend "s3" {
     bucket = "tfpocbucket001"
-    key    = "k8s/ec2/terraform.tfstate"
-    region = "eu-north-1"
+    key    = "kubernetes/terraform.tfstate"
+    region = local.region # "eu-north-1"
   }
 }
 

@@ -86,7 +86,9 @@ sudo openssl x509 -req -in samit.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/
 
 # RBAC for the user
 kubectl create clusterrolebinding samit-admin-binding --clusterrole=cluster-admin --user=samit
+```
 
+```sh
 # Create kubeconfig file for the user
 kubectl config set-cluster ec2-k8s --certificate-authority=/etc/kubernetes/pki/ca.crt --embed-certs=true --server=https://<cluster_vm_public_ip>:6443 --kubeconfig=samit-kubeconfig
 
@@ -95,16 +97,18 @@ kubectl config set-credentials samit --client-certificate=samit.crt --client-key
 kubectl config set-context ec2-k8s-samit-context --cluster=ec2-k8s --user=samit --kubeconfig=samit-kubeconfig
 
 kubectl config use-context ec2-k8s-samit-context --kubeconfig=samit-kubeconfig
+```
 
+```sh
 # Test
 kubectl --kubeconfig=samit-kubeconfig get pods
 kubectl --kubeconfig=samit-kubeconfig get nodes
-
+```
+```sh
 # or
 export KUBECONFIG=$(pwd)/samit-kubeconfig
 kubectl get pods
 kubectl getnodes
- 
 ```
 
 ##### Create a normal user with minimum access
@@ -118,20 +122,23 @@ openssl req -new -newkey rsa:2048 -nodes -keyout amit.key -out amit.csr -subj "/
 sudo openssl x509 -req -in amit.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out amit.crt -days 30
 
 kubectl create rolebinding amit-binding --clusterrole=view --user=amit --namespace=default
+```
 
+```sh
 # Create kubeconfig file for the user
-kubectl config set-cluster ec2-k8s --certificate-authority=/etc/kubernetes/pki/ca.crt --embed-certs=true --server=https://51.20.142.74:6443 --kubeconfig=amit-kubeconfig
+kubectl config set-cluster ec2-k8s --certificate-authority=/etc/kubernetes/pki/ca.crt --embed-certs=true --server=https://<cluster_vm_public_ip>:6443 --kubeconfig=amit-kubeconfig
 
 kubectl config set-credentials amit --client-certificate=amit.crt --client-key=amit.key --embed-certs=true --kubeconfig=amit-kubeconfig
 
 kubectl config set-context ec2-k8s-amit-context --cluster=ec2-k8s --user=amit --kubeconfig=amit-kubeconfig
 
 kubectl config use-context ec2-k8s-amit-context --kubeconfig=amit-kubeconfig
+```
 
+```sh
 # Test
 kubectl --kubeconfig=amit-kubeconfig get pods #This will work and can be seen pods running on default namespace
 kubectl --kubeconfig=amit-kubeconfig get nodes # Forbidden
-
 ```
 
 After done the above steps, If you hit the below command , The config file will show something similar describe in `Sample kubeconfig file` section.
@@ -199,7 +206,8 @@ rules:
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["watch"]
-
+```
+```yml
 # Binding the developer role to a user
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -214,7 +222,8 @@ roleRef:
   kind: Role
   name: developer
   apiGroup: rbac.authorization.k8s.io
-
+```
+```yml
 # Deployment role with full access
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -224,7 +233,8 @@ rules:
 - apiGroups: [""]
   resources: ["*"]
   verbs: ["*"]
-
+```
+```yml
 # Binding the deployer role to a user
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -238,9 +248,11 @@ roleRef:
   kind: ClusterRole
   name: deployer
   apiGroup: rbac.authorization.k8s.io
-
 ```
 
 [back](../../../README.md)
 
+```sh
+# copy config file from remote to local
 scp -i id_rsa.pem ubuntu@13.61.5.139:/home/ubuntu/.kube/config /home/ubuntu/.kube
+```

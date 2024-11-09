@@ -7,7 +7,7 @@
     cn_name: "/CN=amit"
     kubeconfig_file: "/home/{{ ansible_user }}/{{ user_name }}-kubeconfig"
     control_plane_ip: "<vm_public_ip>"
-    clusterrole: "view"
+    clusterrole: ["list","get","create","delete","update","patch"]
     local_copy_path: "/home/ubuntu/Desktop/k8s/k8s-user-files"  # Local directory to store copied files
     remote_kubeconfig_path: "/home/ubuntu/.kube/config"
     local_kubeconfig_path: "/home/ubuntu/.kube/"

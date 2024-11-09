@@ -250,9 +250,10 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 ```
 
-[back](../../../README.md)
-
+***OR run the config-playbook with required changes for autocreate***
 ```sh
-# copy config file from remote to local
-scp -i id_rsa.pem ubuntu@13.61.5.139:/home/ubuntu/.kube/config /home/ubuntu/.kube
+ansible-playbook -i inventory.yml config-playbook.yml --ask-become-pass
 ```
+* Note: it is asking for your local system password
+
+[back](../../../README.md)

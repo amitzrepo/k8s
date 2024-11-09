@@ -1,0 +1,158 @@
+---
+- name: Setup Kubernetes User and Kubeconfig
+  hosts: manager
+  become: true
+  vars:
+    user_name: amit
+    cn_name: "/CN=amit"
+    kubeconfig_file: "/home/{{ ansible_user }}/{{ user_name }}-kubeconfig"
+    control_plane_ip: "13.49.225.203"
+    clusterrole: "view"
+    local_copy_path: "/home/ubuntu/Desktop/k8s/k8s-user-files"  # Local directory to store copied files
+    remote_kubeconfig_path: "/home/ubuntu/.kube/config"
+    local_kubeconfig_path: "/home/ubuntu/.kube/"
+
+  tasks:
+    - name: Check if CSR file exists
+      stat:
+        path: "{{ user_name }}.csr"
+      register: csr_stat
+
+    - name: Generate private key and certificate signing request (CSR) if not exists
+      command: >
+        openssl req -new -newkey rsa:2048 -nodes
+        -keyout {{ user_name }}.key
+        -out {{ user_name }}.csr
+        -subj {{ cn_name }}
+      when: not csr_stat.stat.exists
+      register: openssl_output
+
+    - name: Check if user certificate exists
+      stat:
+        path: "{{ user_name }}.crt"
+      register: crt_stat
+
+    - name: Sign the CSR with Kubernetes CA to create user certificate if not exists
+      command: >
+        openssl x509 -req -in {{ user_name }}.csr
+        -CA /etc/kubernetes/pki/ca.crt
+        -CAkey /etc/kubernetes/pki/ca.key
+        -CAcreateserial -out {{ user_name }}.crt -days 30
+      when: openssl_output is success and not crt_stat.stat.exists
+
+    - name: Create cluster role binding for the user if not exists
+      command: >
+        kubectl create clusterrolebinding {{ user_name }}-admin-binding
+        --clusterrole={{ clusterrole }} --user={{ user_name }}
+        --kubeconfig={{ remote_kubeconfig_path }}
+      ignore_errors: true
+
+    - name: Check if kubeconfig file exists
+      stat:
+        path: "{{ kubeconfig_file }}"
+      register: kubeconfig_stat
+
+    - name: Set cluster in kubeconfig file if not exists
+      command: >
+        kubectl config set-cluster ec2-k8s
+        --certificate-authority=/etc/kubernetes/pki/ca.crt
+        --embed-certs=true
+        --server=https://{{ control_plane_ip }}:6443
+        --kubeconfig={{ kubeconfig_file }}
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Set user credentials in kubeconfig file if not exists
+      command: >
+        kubectl config set-credentials {{ user_name }}
+        --client-certificate={{ user_name }}.crt
+        --client-key={{ user_name }}.key
+        --embed-certs=true
+        --kubeconfig={{ kubeconfig_file }}
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Set context in kubeconfig file if not exists
+      command: >
+        kubectl config set-context ec2-k8s-{{ user_name }}-context
+        --cluster=ec2-k8s
+        --user={{ user_name }}
+        --kubeconfig={{ kubeconfig_file }}
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Use context in kubeconfig file if not exists
+      command: >
+        kubectl config use-context ec2-k8s-{{ user_name }}-context
+        --kubeconfig={{ kubeconfig_file }}
+      when: not kubeconfig_stat.stat.exists
+
+    - name: Ensure local copy directory exists
+      local_action:
+        module: file
+        path: "{{ local_copy_path }}"
+        state: directory
+      run_once: true
+
+    - name: Fetch user certificate to local machine if not exists locally
+      stat:
+        path: "{{ local_copy_path }}/{{ user_name }}.crt"
+      register: local_crt_stat
+      delegate_to: localhost
+
+    - name: Fetch user certificate to local machine
+      fetch:
+        src: "{{ user_name }}.crt"
+        dest: "{{ local_copy_path }}/"
+        flat: yes
+      when: not local_crt_stat.stat.exists
+
+    - name: Fetch signing certificate to local machine if not exists locally
+      stat:
+        path: "{{ local_copy_path }}/{{ user_name }}.csr"
+      register: local_csr_stat
+      delegate_to: localhost
+
+    - name: Fetch signing certificate to local machine
+      fetch:
+        src: "{{ user_name }}.csr"
+        dest: "{{ local_copy_path }}/"
+        flat: yes
+      when: not local_csr_stat.stat.exists
+
+    - name: Fetch user key to local machine if not exists locally
+      stat:
+        path: "{{ local_copy_path }}/{{ user_name }}.key"
+      register: local_key_stat
+      delegate_to: localhost
+
+    - name: Fetch user key to local machine
+      fetch:
+        src: "{{ user_name }}.key"
+        dest: "{{ local_copy_path }}/"
+        flat: yes
+      when: not local_key_stat.stat.exists
+
+    - name: Fetch kubeconfig file to local machine if not exists locally
+      stat:
+        path: "{{ local_copy_path }}/{{ user_name }}-kubeconfig"
+      register: local_kubeconfig_stat
+      delegate_to: localhost
+
+    - name: Fetch kubeconfig file to local machine
+      fetch:
+        src: "{{ kubeconfig_file }}"
+        dest: "{{ local_copy_path }}/"
+        flat: yes
+      when: not local_kubeconfig_stat.stat.exists
+
+    - name: Ensure local directory exists
+      local_action:
+        module: file
+        path: "{{ local_kubeconfig_path }}"
+        state: directory
+      run_once: true
+
+    - name: Fetch kubeconfig file from remote to local machine
+      fetch:
+        src: "{{ remote_kubeconfig_path }}"
+        dest: "{{ local_kubeconfig_path }}"
+        flat: yes
+      become: false

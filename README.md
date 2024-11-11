@@ -64,9 +64,14 @@ ansible -i inventory.yml all -m ping
 ```sh
 ansible-playbook -i inventory.yml playbook.yml --syntax-check
 ```
+***Kubernetes user creation (ansible)***
+```sh
+ansible-playbook -i inventory.yml config-playbook.yml --ask-become-pass
+```
+* Note: it is asking for your local system password
+* Change the required parameter before runing the playbook
 
-
-### Kubernetes User creation
+### Kubernetes User creation (manual)
 
 > ssh to the cluster and try to execute below command on the cluster it self.
 
@@ -249,11 +254,5 @@ roleRef:
   name: deployer
   apiGroup: rbac.authorization.k8s.io
 ```
-
-***OR run the config-playbook with required changes for autocreate***
-```sh
-ansible-playbook -i inventory.yml config-playbook.yml --ask-become-pass
-```
-* Note: it is asking for your local system password
 
 [back](../../../README.md)

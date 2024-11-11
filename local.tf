@@ -14,8 +14,8 @@ resource "null_resource" "set_readonly" {
   }
 }
 
-resource "null_resource" "create_local_directory" {
-  provisioner "local-exec" {
-    command = "mkdir -p /home/ubuntu/Desktop/k8s/k8s-user-files"
-  }
-}
+# resource "null_resource" "create_local_directory" {
+#   provisioner "local-exec" {
+#     command = "mkdir -p /home/ubuntu/Desktop/k8s/k8s-user-files"
+#   }
+# }

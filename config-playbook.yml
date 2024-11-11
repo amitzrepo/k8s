@@ -6,7 +6,7 @@
     user_name: amit
     cn_name: "/CN=amit"
     kubeconfig_file: "/home/{{ ansible_user }}/{{ user_name }}-kubeconfig"
-    control_plane_ip: "13.49.225.203"
+    control_plane_ip: "16.171.64.178"
     clusterrole: "view"
     local_copy_path: "/home/ubuntu/Desktop/k8s/k8s-user-files"  # Local directory to store copied files
     remote_kubeconfig_path: "/home/ubuntu/.kube/config"
@@ -90,46 +90,7 @@
         path: "{{ local_copy_path }}"
         state: directory
       run_once: true
-
-    - name: Fetch user certificate to local machine if not exists locally
-      stat:
-        path: "{{ local_copy_path }}/{{ user_name }}.crt"
-      register: local_crt_stat
-      delegate_to: localhost
-
-    - name: Fetch user certificate to local machine
-      fetch:
-        src: "{{ user_name }}.crt"
-        dest: "{{ local_copy_path }}/"
-        flat: yes
-      when: not local_crt_stat.stat.exists
-
-    - name: Fetch signing certificate to local machine if not exists locally
-      stat:
-        path: "{{ local_copy_path }}/{{ user_name }}.csr"
-      register: local_csr_stat
-      delegate_to: localhost
-
-    - name: Fetch signing certificate to local machine
-      fetch:
-        src: "{{ user_name }}.csr"
-        dest: "{{ local_copy_path }}/"
-        flat: yes
-      when: not local_csr_stat.stat.exists
-
-    - name: Fetch user key to local machine if not exists locally
-      stat:
-        path: "{{ local_copy_path }}/{{ user_name }}.key"
-      register: local_key_stat
-      delegate_to: localhost
-
-    - name: Fetch user key to local machine
-      fetch:
-        src: "{{ user_name }}.key"
-        dest: "{{ local_copy_path }}/"
-        flat: yes
-      when: not local_key_stat.stat.exists
-
+    
     - name: Fetch kubeconfig file to local machine if not exists locally
       stat:
         path: "{{ local_copy_path }}/{{ user_name }}-kubeconfig"
@@ -156,3 +117,42 @@
         dest: "{{ local_kubeconfig_path }}"
         flat: yes
       become: false
+
+    # - name: Fetch user certificate to local machine if not exists locally
+    #   stat:
+    #     path: "{{ local_copy_path }}/{{ user_name }}.crt"
+    #   register: local_crt_stat
+    #   delegate_to: localhost
+
+    # - name: Fetch user certificate to local machine
+    #   fetch:
+    #     src: "{{ user_name }}.crt"
+    #     dest: "{{ local_copy_path }}/"
+    #     flat: yes
+    #   when: not local_crt_stat.stat.exists
+
+    # - name: Fetch signing certificate to local machine if not exists locally
+    #   stat:
+    #     path: "{{ local_copy_path }}/{{ user_name }}.csr"
+    #   register: local_csr_stat
+    #   delegate_to: localhost
+
+    # - name: Fetch signing certificate to local machine
+    #   fetch:
+    #     src: "{{ user_name }}.csr"
+    #     dest: "{{ local_copy_path }}/"
+    #     flat: yes
+    #   when: not local_csr_stat.stat.exists
+
+    # - name: Fetch user key to local machine if not exists locally
+    #   stat:
+    #     path: "{{ local_copy_path }}/{{ user_name }}.key"
+    #   register: local_key_stat
+    #   delegate_to: localhost
+
+    # - name: Fetch user key to local machine
+    #   fetch:
+    #     src: "{{ user_name }}.key"
+    #     dest: "{{ local_copy_path }}/"
+    #     flat: yes
+    #   when: not local_key_stat.stat.exists

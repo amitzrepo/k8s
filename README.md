@@ -64,9 +64,9 @@ ansible -i inventory.yml all -m ping
 ```sh
 ansible-playbook -i inventory.yml playbook.yml --syntax-check
 ```
-***Kubernetes user creation (ansible)***
+### Kubernetes user creation (ansible)***
 ```sh
-ansible-playbook -i inventory.yml config-playbook.yml --ask-become-pass
+ansible-playbook -i inventory.yml playbook-local-config.yml --ask-become-pass
 ```
 * Note: it is asking for your local system password
 * Change the required parameter before runing the playbook

@@ -1,4 +1,3 @@
----
 - name: Setup Kubernetes User and Kubeconfig
   hosts: manager
   become: true
@@ -6,11 +5,12 @@
     user_name: amit
     cn_name: "/CN=amit"
     kubeconfig_file: "/home/{{ ansible_user }}/{{ user_name }}-kubeconfig"
-    control_plane_ip: "16.171.64.178"
-    clusterrole: admin
-    local_copy_path: "/home/ubuntu/Desktop/k8s/k8s-userfiles/"  # Local directory to store copied files
+    control_plane_ip: "13.51.108.90"
+    clusterrole: admin-cluster
     remote_config_path: "/home/ubuntu/.kube/config"
     local_config_path: "/home/ubuntu/.kube/"
+    local_copy_path: "/home/ubuntu/Desktop/k8s/k8s-user-files"  # Local directory to store copied files
+    
 
   tasks:
     - name: Check if CSR file exists
@@ -40,12 +40,17 @@
         -CAcreateserial -out {{ user_name }}.crt -days 30
       when: openssl_output is success and not crt_stat.stat.exists
 
+    - name: Check if cluster role binding exists
+      command: kubectl get clusterrolebinding {{ user_name }}-role-binding --kubeconfig={{ remote_config_path }}
+      register: role_binding_check
+      ignore_errors: true
+
     - name: Create cluster role binding for the user if not exists
       command: >
         kubectl create clusterrolebinding {{ user_name }}-role-binding
         --clusterrole={{ clusterrole }} --user={{ user_name }}
         --kubeconfig={{ remote_config_path }}
-      ignore_errors: true
+      when: role_binding_check.rc != 0
 
     - name: Check if kubeconfig file exists
       stat:
@@ -85,8 +90,8 @@
       when: not kubeconfig_stat.stat.exists
 
     - name: Ensure local .kube directory exists
-      local_action:
-        module: file
+      delegate_to: localhost
+      file:
         path: "{{ local_config_path }}"
         state: directory
       run_once: true
@@ -99,8 +104,8 @@
       become: false
 
     - name: Ensure local copy directory exists
-      local_action:
-        module: file
+      delegate_to: localhost
+      file:
         path: "{{ local_copy_path }}"
         state: directory
       run_once: true
@@ -110,10 +115,12 @@
         path: "{{ local_copy_path }}/{{ user_name }}-kubeconfig"
       register: local_kubeconfig_stat
       delegate_to: localhost
+      become: true
 
-    - name: Fetch kubeconfig file to local machine
+    - name: Fetch kubeconfig file to local machine      
       fetch:
         src: "{{ kubeconfig_file }}"
-        dest: "{{ local_copy_path }}"
+        dest: "{{ local_copy_path }}/"
         flat: yes
-      when: not local_kubeconfig_stat.stat.exists
+      when: kubeconfig_stat.stat.exists and not local_kubeconfig_stat.stat.exists
+      become: false

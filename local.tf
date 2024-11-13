@@ -1,6 +1,6 @@
 # Local copy of key_pair
 resource "local_file" "key" {
-  depends_on = [ aws_key_pair.foo ]
+  depends_on = [ aws_instance.manager ]
   content  = tls_private_key.foo.private_key_pem
   filename = "${aws_key_pair.foo.key_name}.pem"
 }

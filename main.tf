@@ -23,9 +23,9 @@ provider "aws" {
 }
 
 locals {
-  region = "eu-north-1"
+  region = "ap-south-2"
 
-  ami           = "ami-08eb150f611ca277f"
+  ami           = "ami-0867df9d01e38f97d"
   instance_type = "t3.medium"
   workers_count = 2
   tags = {

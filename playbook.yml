@@ -42,7 +42,7 @@
 
     - name: Disable UFW
       ansible.builtin.command: ufw disable
-      ignore_errors: yes
+      ignore_errors: true
 
     - name: Remove conflicting packages
       ansible.builtin.apt:

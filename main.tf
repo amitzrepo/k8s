@@ -28,59 +28,98 @@ locals {
   ami           = "ami-0867df9d01e38f97d"
   instance_type = "t3.medium"
   workers_count = 2
+
   tags = {
-    infra = "k8s-ec2"
+    Name = "k8s-ec2-public"
+    env  = "dev"
   }
 }
 
-# default VPC
-data "aws_vpc" "default" {
-  default = true
+#VPC
+resource "aws_vpc" "k8s_vpc" {
+  cidr_block = "172.16.0.0/16"
+  tags       = local.tags
 }
 
-# default SUBNET
-data "aws_subnets" "default" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-}
-
-data "aws_subnet" "public" {
-  id = data.aws_subnets.default.ids[0]
-}
-
-data "aws_subnet" "private" {
-  id = data.aws_subnets.default.ids[1]
-}
-
-# NAT Gateway
-resource "aws_eip" "private" {
-  domain = "vpc"
-}
-
-resource "aws_nat_gateway" "private" {
-  allocation_id = aws_eip.private.id
-  subnet_id     = data.aws_subnet.public.id
+#INTERNET GATEWAY (IGW) 
+resource "aws_internet_gateway" "k8s_igw" {
+  vpc_id = aws_vpc.k8s_vpc.id
 
   tags = local.tags
 }
 
-# Route Table
-resource "aws_route_table" "private" {
-  vpc_id = data.aws_vpc.default.id
-
-  route {
-    cidr_block = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.private.id
-  }
-
-  tags = merge(local.tags, { Name = "private" })
+#SUBNET
+resource "aws_subnet" "k8s_public_subnet" {
+  vpc_id                  = aws_vpc.k8s_vpc.id
+  cidr_block              = "172.16.1.0/24"
+  map_public_ip_on_launch = true
+  tags                    = local.tags
 }
 
-resource "aws_route_table_association" "private" {
-  subnet_id      = data.aws_subnet.private.id
-  route_table_id = aws_route_table.private.id
+# ROUTE TABLE
+resource "aws_route_table" "k8s_route_table" {
+  vpc_id = aws_vpc.k8s_vpc.id
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.k8s_igw.id
+  }
+  tags = local.tags
+}
+
+# subnet attachment to ROUTE TABLE
+resource "aws_route_table_association" "k8s_route_table_association" {
+  depends_on = [
+    aws_subnet.k8s_public_subnet
+  ]
+  subnet_id      = aws_subnet.k8s_public_subnet.id
+  route_table_id = aws_route_table.k8s_route_table.id
+}
+
+# SECURITY GROUP
+resource "aws_security_group" "k8s_sg" {
+  vpc_id = aws_vpc.k8s_vpc.id
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # ingress {
+  #   from_port   = 80
+  #   to_port     = 80
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  # }
+
+  # ingress {
+  #   from_port   = 443
+  #   to_port     = 443
+  #   protocol    = "tcp"
+  #   cidr_blocks = ["0.0.0.0/0"]
+  # }
+
+  ingress {
+    from_port   = 6443
+    to_port     = 6443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 30000
+    to_port     = 32767
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = local.tags
+
 }
 
 # RSA KEY PAIR
@@ -99,197 +138,63 @@ output "ssh_key" {
   sensitive = true
 }
 
-# Security Group
-resource "aws_security_group" "manager_sg" {
-  name   = "manager_sg"
-  vpc_id = data.aws_vpc.default.id
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    from_port   = 6443
-    to_port     = 6443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Kubernetes API server"
-  }
-
-  ingress {
-    from_port   = 2379
-    to_port     = 2380
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "etcd server client API"
-  }
-
-  ingress {
-    from_port   = 10250
-    to_port     = 10250
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Kubelet API"
-  }
-
-  ingress {
-    from_port   = 10259
-    to_port     = 10259
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "kube-scheduler"
-  }
-
-  ingress {
-    from_port   = 10257
-    to_port     = 10257
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "kube-controller-manager"
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = local.tags
+# CONTROL PLANE NETWORK INTERFACE
+resource "aws_network_interface" "network_interface_control_plane" {
+  subnet_id       = aws_subnet.k8s_public_subnet.id
+  security_groups = [aws_security_group.k8s_sg.id]
+  tags            = merge(local.tags, { Name = "Control-Plane-ENI" })
 }
 
-resource "aws_security_group" "worker_sg" {
-  name   = "worker_sg"
-  vpc_id = data.aws_vpc.default.id
-
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [data.aws_subnet.public.cidr_block]
-  }
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [data.aws_subnet.public.cidr_block]
-  }
-
-  ingress {
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [data.aws_subnet.public.cidr_block]
-  }
-
-  ingress {
-    from_port   = 10250
-    to_port     = 10250
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Adjust based on your requirements description = "Kubelet API" 
-  }
-
-  ingress {
-    from_port   = 10256
-    to_port     = 10256
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Adjust based on your requirements description = "kube-proxy" 
-  }
-
-  ingress {
-    from_port   = 30000
-    to_port     = 32767
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "NodePort Services"
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = local.tags
-}
-
-resource "aws_network_interface" "public_ni" {
-
-  subnet_id       = data.aws_subnet.public.id
-  security_groups = [aws_security_group.manager_sg.id]
-
-  tags = local.tags
-}
-
-# ec2
-resource "aws_instance" "manager" {
+# CONTROL PLANE INSTANCE
+resource "aws_instance" "k8s_control_plane" {
   ami           = local.ami
   instance_type = local.instance_type
+  key_name      = aws_key_pair.foo.key_name
 
+  # Attach the network interface
   network_interface {
-    network_interface_id = aws_network_interface.public_ni.id
+    network_interface_id = aws_network_interface.network_interface_control_plane.id
     device_index         = 0
   }
 
-  key_name = aws_key_pair.foo.key_name
-
-  credit_specification {
-    cpu_credits = "unlimited"
-  }
-
-  tags = merge(local.tags, { Name = "Manager" })
+  tags = merge(local.tags, { Name = "Control-Plane" })
 }
 
-
-resource "aws_network_interface" "private_ni" {
-
-  count = local.workers_count
-
-  subnet_id       = data.aws_subnet.private.id
-  security_groups = [aws_security_group.worker_sg.id]
-
-  tags = local.tags
+# WORKER NETWORK INTERFACES
+resource "aws_network_interface" "network_interface_worker" {
+  count           = local.workers_count
+  subnet_id       = aws_subnet.k8s_public_subnet.id
+  security_groups = [aws_security_group.k8s_sg.id]
+  tags            = merge(local.tags, { Name = "Worker-ENI-${count.index + 1}" })
 }
 
-resource "aws_instance" "worker" {
+# WORKER INSTANCES
+resource "aws_instance" "k8s_worker" {
   count         = local.workers_count
   ami           = local.ami
   instance_type = local.instance_type
   key_name      = aws_key_pair.foo.key_name
-  #associate_public_ip_address = false
 
+  # Attach each worker instance to its corresponding network interface
   network_interface {
-    network_interface_id = aws_network_interface.private_ni[count.index].id
+    network_interface_id = aws_network_interface.network_interface_worker[count.index].id
     device_index         = 0
   }
 
-  credit_specification {
-    cpu_credits = "unlimited"
-  }
-
-  tags = merge(local.tags, { Name = "Worker" })
+  tags = merge(local.tags, { Name = "Worker-${count.index + 1}" })
 }
 
-locals {
-  worker_ips = [for instance in aws_instance.worker : instance.private_ip]
+output "control_plane_ip" {
+  value = aws_instance.k8s_control_plane.public_ip
 }
 
-output "worker_private_ips" {
-  value = [for instance in aws_instance.worker : instance.private_ip]
-}
-
-output "manager_ip" {
-  value = aws_instance.manager.public_ip
+output "worker_ips" {
+  value = [for instance in aws_instance.k8s_worker : instance.public_ip]
 }
 
 # ansible ansible-inventory -i inventory.yml --list (show the inventory)
 resource "ansible_host" "manager" {
-  name   = aws_instance.manager.public_ip
+  name   = aws_instance.k8s_control_plane.public_ip
   groups = ["manager"]
   variables = {
     ansible_user                 = "ubuntu"
@@ -302,13 +207,13 @@ resource "ansible_host" "manager" {
 
 resource "ansible_host" "worker" {
   count  = local.workers_count
-  name   = local.worker_ips[count.index]
+  name   = aws_instance.k8s_worker[count.index].public_ip
   groups = ["worker"]
   variables = {
     ansible_user                 = "ubuntu"
     ansible_ssh_private_key_file = "id_rsa.pem"
     ansible_connection           = "ssh"
-    ansible_ssh_common_args      = "-o StrictHostKeyChecking=no -o ProxyCommand='ssh -W %h:%p -q ubuntu@${aws_instance.manager.public_ip} -i id_rsa.pem'"
+    ansible_ssh_common_args      = "-o StrictHostKeyChecking=no"
     ansible_python_interpreter   = "/usr/bin/python3"
   }
 }

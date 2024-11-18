@@ -57,6 +57,11 @@
         state: directory
         mode: '0755'
 
+    - name: Check if containerd is available
+      ansible.builtin.stat:
+        path: /usr/local/lib/systemd/system/containerd.service
+      register: containerd_installation_status
+    
     - block:
       - name: Download containerd archive
         ansible.builtin.get_url:
@@ -124,6 +129,12 @@
         ansible.builtin.systemd:
           name: containerd
           state: restarted
+      when: not containerd_installation_status.stat.exists
+    
+    - name: Check If kubernetes is already installed
+      ansible.builtin.stat:
+        path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+      register: kkk_installation_status
     
     - block:
       - name: Download Kubernetes signing key
@@ -156,6 +167,7 @@
       - name: Hold kubelet, kubeadm, and kubectl packages
         ansible.builtin.command:
           cmd: sudo apt-mark hold kubelet kubeadm kubectl
+      when: not kkk_installation_status.stat.exists
 
 - name: Setup Control Plane Node
   hosts: manager
